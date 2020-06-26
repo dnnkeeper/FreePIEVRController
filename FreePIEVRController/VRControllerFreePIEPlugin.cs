@@ -132,8 +132,11 @@ namespace FreePIEVRController
     [Global(Name = "vrcontroller")]
     public class VRControllerGlobal
     {
+        DeviceInfo currentDevice;
+
         internal VRControllerGlobal(int index, DeviceInfo device)
         {
+            currentDevice = device;
             Connect(device).Wait();
         }
 
@@ -305,7 +308,10 @@ namespace FreePIEVRController
                 gyroscope[1] = gy;
                 gyroscope[2] = gz;
 
-                AHRS.Update((float)gx, (float)gy, (float)gz, (float)ax, (float)ay, (float)az, (float)magnetometer[0], (float)magnetometer[1], (float)magnetometer[2]);
+                if (useMagnetometer)
+                    AHRS.Update((float)gx, (float)gy, (float)gz, (float)ax, (float)ay, (float)az, (float)magnetometer[0], (float)magnetometer[1], (float)magnetometer[2]);
+                else
+                    AHRS.Update((float)gx, (float)gy, (float)gz, (float)ax, (float)ay, (float)az);
             }
 
             // We need to fix the difference of coordinate system between AHRS and VR app.
@@ -410,8 +416,34 @@ namespace FreePIEVRController
             return false;
         }
 
+        async Task<bool> SetNotify()
+        {
+            var status = await AsTask(gearvrDataCharacteristic.WriteClientCharacteristicConfigurationDescriptorAsync(GattClientCharacteristicConfigurationDescriptorValue.Notify));
+            if (status == GattCommunicationStatus.Unreachable)
+            {
+                Console.WriteLine("Error: Failed to enable notify.");
+                return false;
+            }
+            //
+            // Start to get sensor data
+            //
+            status = await gearvrCommandCharacteristic.WriteValueAsync(getBuffer(Constants.GEARVR_COMMAND_VR_MODE));
+            if (status == GattCommunicationStatus.Unreachable)
+            {
+
+                Console.WriteLine("Error: Failed to enable notify.");
+                return false;
+            }
+            return true;
+        }
+
         async Task<bool> ConnectGearVR(DeviceInformation info)
         {
+            if (service != null)
+            {
+                Close();
+            }
+
             try
             {
                 Console.WriteLine(string.Format("Trying to connect {0} {1}", info.Name, info.Id));
@@ -421,7 +453,8 @@ namespace FreePIEVRController
                     Console.WriteLine("Error: Another program is using the device.");
                     return false;
                 }
-
+                
+                service.Session.SessionStatusChanged += Session_SessionStatusChanged;
                 //
                 // Get characteristics
                 //
@@ -432,6 +465,7 @@ namespace FreePIEVRController
                     Console.WriteLine("Error: No characteristics. uuid=GEARVR_DATA_CHARACTERISTICS_UUID.");
                     return false;
                 }
+                Console.WriteLine("gearvrDataCharacteristics count " + list.Count);
                 gearvrDataCharacteristic = list[0];
 
                 list = service.GetCharacteristics(Constants.GEARVR_COMMAND_CHARACTERISTICS_UUID);
@@ -448,26 +482,16 @@ namespace FreePIEVRController
 
                 gearvrDataCharacteristic.ValueChanged += CallbackGearVR;
 
-                var status = await AsTask(gearvrDataCharacteristic.WriteClientCharacteristicConfigurationDescriptorAsync(GattClientCharacteristicConfigurationDescriptorValue.Notify));
-                if (status == GattCommunicationStatus.Unreachable)
-                {
-                    Console.WriteLine("Error: Failed to enable notify.");
-                    return false;
-                }
+                //var status = await AsTask(gearvrDataCharacteristic.WriteClientCharacteristicConfigurationDescriptorAsync(GattClientCharacteristicConfigurationDescriptorValue.Notify));
+                //if (status == GattCommunicationStatus.Unreachable)
+                //{
+                //    Console.WriteLine("Error: Failed to enable notify.");
+                //    return false;
+                //}
 
-                //
-                // Start to get sensor data
-                //
+                await SetNotify();
 
-                status = await gearvrCommandCharacteristic.WriteValueAsync(getBuffer(Constants.GEARVR_COMMAND_VR_MODE));
-                if (status == GattCommunicationStatus.Unreachable)
-                {
-
-                    Console.WriteLine("Error: Failed to enable notify.");
-                    return false;
-                }
-
-                status = await gearvrCommandCharacteristic.WriteValueAsync(getBuffer(Constants.GEARVR_COMMAND_SENSOR));
+                var status = await gearvrCommandCharacteristic.WriteValueAsync(getBuffer(Constants.GEARVR_COMMAND_SENSOR));
                 if (status == GattCommunicationStatus.Success)
                 {
                     Console.WriteLine("Connected.");
@@ -493,6 +517,11 @@ namespace FreePIEVRController
             return false;
         }
 
+        private void Session_SessionStatusChanged(GattSession sender, GattSessionStatusChangedEventArgs args)
+        {
+            Console.WriteLine("Session_SessionStatusChanged " + args.Status);
+        }
+
         IBuffer getBuffer(short i)
         {
             var writer = new Windows.Storage.Streams.DataWriter();
@@ -515,6 +544,44 @@ namespace FreePIEVRController
             return tcs.Task;
         }
 
+        public bool HasService { get { return service != null && service.Session.SessionStatus == GattSessionStatus.Active; } }
+        public bool HasData { get { return gearvrDataCharacteristic != null; } }
+
+        public int TimeMS { get { return DateTime.Now.Millisecond; } }
+
+        public void SetAHRSBeta(float v)
+        {
+            AHRS.Beta = v;
+        }
+
+        public void SetAHRSPeriod(float v)
+        {
+            AHRS.SamplePeriod = v;
+        }
+
+
+        public void SetNotifyTest()
+        {
+            SetNotify().Wait();
+        }
+
+        public bool Reconnect()
+        {
+            if (gearvrDataCharacteristic != null)
+            {
+                Close();
+                Connect(currentDevice).Wait();
+                return true;
+            }
+
+            return false;
+        }
+
+        public void Recenter(double[] hmd_rotation)
+        {
+            return;
+        }
+
         // Controller orientation in quaternion(x,y,z,w) rad.
         public double[] quaternion { get; private set; } = new double[4];
         // Orientation raw (x,y,z) (only for Daydream)
@@ -532,6 +599,8 @@ namespace FreePIEVRController
         // Buttons (touchpad touch, touchpad click, home, app(daydream)/back(gearvr), vol down, vol up, trigger(gearvr only))
         private const int CONST_BUTTONS = 7;
         public bool[] button { get; private set; } = new bool[CONST_BUTTONS];
+
+        public bool useMagnetometer { get; set; } = true;
 
         public int TOUCH { get; } = 0;
         public int CLICK { get; } = 1;
