@@ -111,6 +111,9 @@ def euler2quaternion(yaw_pitch_roll):
 def rotatevec(yaw_pitch_roll, vec):
 	q = euler2quaternion(yaw_pitch_roll)
 	return multiply(multiply(q, vec), conj(q))
+	
+def rotatevecq(q, vec):
+	return multiply(multiply(q, vec), conj(q))
 
 def cross(one, other):
 	"""
@@ -394,7 +397,7 @@ def updateRightHand():
 	
 	diagnostics.watch(_rightHandLocalPosition[0]), diagnostics.watch(_rightHandLocalPosition[1]), diagnostics.watch(_rightHandLocalPosition[2])
 	
-	handPivotPosition = add(alvr.head_position, rotatevec(alvr.head_orientation, _rightArmLocalPosition) )
+	handPivotPosition = add(alvr.head_position, rotatevec(alvr.input_head_orientation, _rightArmLocalPosition) )
 	
 	handRotation = getALVRControllerRotation()
 	
@@ -496,7 +499,7 @@ def updateLeftHand():
 	
 	diagnostics.watch(_leftHandLocalPosition[0]), diagnostics.watch(_leftHandLocalPosition[1]), diagnostics.watch(_leftHandLocalPosition[2])
 	
-	handPivotPosition = add(alvr.head_position, rotatevec(alvr.head_orientation, _leftArmLocalPosition) )
+	handPivotPosition = add(alvr.head_position, rotatevec(alvr.input_head_orientation, _leftArmLocalPosition) )
 	
 	handRotation = getVRControllerRotation(0)
 	
