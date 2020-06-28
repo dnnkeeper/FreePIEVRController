@@ -393,7 +393,7 @@ def updateRightHand():
 	if (_isTouchedRight):
 		_rightHandLocalPosition[0] += _deltaTouchRight[0] * TouchSensivityX 
 		_rightHandLocalPosition[2] -= _deltaTouchRight[1] * TouchSensivityY
-	else:
+	elif ((time.time() - _lastTouchTimeRight) > 0.5):
 		t = 2.0 * _deltaTime
 		_rightHandLocalPosition[0] = lerp(_rightHandLocalPosition[0], DefaultHandOffset[0], t)
 		_rightHandLocalPosition[2] = lerp(_rightHandLocalPosition[2], DefaultHandOffset[2], t)
@@ -496,7 +496,7 @@ def updateLeftHand():
 	if (_isTouchedLeft):
 		_leftHandLocalPosition[0] += _deltaTouchLeft[0] * TouchSensivityX 
 		_leftHandLocalPosition[2] -= _deltaTouchLeft[1] * TouchSensivityY
-	else:
+	elif ((time.time() - _lastTouchTimeLeft) > 0.5):
 		t = 2.0 * _deltaTime
 		_leftHandLocalPosition[0] = lerp(_leftHandLocalPosition[0], DefaultHandOffset[0], t)
 		_leftHandLocalPosition[2] = lerp(_leftHandLocalPosition[2], DefaultHandOffset[2], t)
