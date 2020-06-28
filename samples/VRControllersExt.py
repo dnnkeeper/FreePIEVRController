@@ -254,9 +254,11 @@ def getVRControllerPosition(id):
 	pos = vrcontroller[id]
 	return [pos[0], pos[1], pos[2]]
 	
-global _correctionLeftRotation
+global _correctionLeftRotation, _savedLeftOrientation, _savedRightOrientation
 if (starting):
+	_savedRightRotation = [0,0,0,1]
 	_correctionLeftRotation = [0,0,0,1]
+	_savedLeftRotation = [0,0,0,1]
 
 if (starting):
 	angle_radians = [0,0,0,0]
@@ -269,7 +271,8 @@ def getVRControllerRotation(id):
 	
 	global _leftControllerRotation, _leftControllerOrientation
 	_leftControllerOrientation = vrcontroller[id].quaternion
-	newRotation = quaternion2euler( multiply(vrcontroller[id].quaternion, _correctionLeftRotation ) )
+	#newRotation = quaternion2euler( multiply(vrcontroller[id].quaternion, _correctionLeftRotation ) )
+	newRotation = quaternion2euler( multiply(_savedRightRotation, multiply( conj(_savedLeftRotation), vrcontroller[id].quaternion) ) )
 	
 	_leftControllerRotation = newRotation
 	
@@ -465,10 +468,11 @@ def updateLeftController():
 	
 	global _leftControllerHome
 	if (vrcontroller[0].home and not _leftControllerHome):
-		global _correctionLeftRotation
+		global _correctionLeftRotation, _savedLeftRotation, _savedRightRotation
 		_leftControllerHome = True
-		#_correctionLeftRotation = multiply( conj( euler2quaternion(_leftControllerRotation) ), euler2quaternion(getALVRControllerRotation()) )
-		_correctionLeftRotation = multiply( conj( _leftControllerOrientation ), euler2quaternion(getALVRControllerRotation()) )
+		#_correctionLeftRotation = multiply( conj( _leftControllerOrientation, euler2quaternion(getALVRControllerRotation()) )
+		_savedLeftRotation = [ _leftControllerOrientation[0], _leftControllerOrientation[1], _leftControllerOrientation[2], _leftControllerOrientation[3] ] 
+		_savedRightRotation = euler2quaternion(getALVRControllerRotation())
 		
 		leftRotNorm = _leftControllerOrientation[0]*_leftControllerOrientation[0] + _leftControllerOrientation[1]*_leftControllerOrientation[1] + _leftControllerOrientation[2]*_leftControllerOrientation[2] + _leftControllerOrientation[3]*_leftControllerOrientation[3]
 		diagnostics.debug(leftRotNorm)
